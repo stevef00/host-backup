@@ -1,6 +1,7 @@
 import argparse
 import yaml
 import os
+import subprocess
 import stat
 from deepmerge import always_merger
 
@@ -65,8 +66,6 @@ def load_host_config(args, global_config):
 
     return config
 
-import os
-import subprocess
 
 def run_ssh_command(admin_host, command, no_op=False, verbose=False):
     """
@@ -86,14 +85,17 @@ def run_ssh_command(admin_host, command, no_op=False, verbose=False):
     if not ssh_auth_sock or not os.path.exists(ssh_auth_sock):
         raise FileNotFoundError("SSH_AUTH_SOCK is not set or points to a non-existent socket file.")
     
-    # FIXME: I'm pretty sure we don't need to use sudo here
-    full_command = f"sudo --preserve-env=SSH_AUTH_SOCK ssh -A {admin_host} '{command}'"
+    full_command = f"ssh -A {admin_host} '{command}'"
 
     if verbose or no_op:
         print(f"Command: {full_command}")
     
     if not no_op:
-        subprocess.run(full_command, shell=True, check=True)
+        try:
+            subprocess.run(full_command, shell=True, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Command failed with exit code {e.returncode}")
+            #raise
 
 def backup_directory(hostname, directory, global_config, host_config, args):
     src = f"{hostname}:{directory}"
@@ -107,7 +109,7 @@ def backup_directory(hostname, directory, global_config, host_config, args):
     rsync_command = f"rsync -avxHP {' '.join(exclude_args)} {src} {dst}"
     run_ssh_command(global_config["admin_host"],
                     rsync_command,
-                    no_op=True, # FIXME: args.no_op
+                    no_op=args.no_op,
                     verbose=args.verbose)
 
 def backup(args, global_config, host_config):
