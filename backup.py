@@ -4,6 +4,7 @@ import os
 import subprocess
 import stat
 from deepmerge import always_merger
+import shlex
 
 # TODO:
 # - validate various configuration values:
@@ -85,7 +86,8 @@ def run_ssh_command(admin_host, command, no_op=False, verbose=False):
     if not ssh_auth_sock or not os.path.exists(ssh_auth_sock):
         raise FileNotFoundError("SSH_AUTH_SOCK is not set or points to a non-existent socket file.")
     
-    full_command = f"ssh -A {admin_host} '{command}'"
+    # Use shlex.quote to properly escape the command
+    full_command = f"ssh -A {admin_host} {shlex.quote(command)}"
 
     if verbose or no_op:
         print(f"Command: {full_command}")
@@ -95,7 +97,7 @@ def run_ssh_command(admin_host, command, no_op=False, verbose=False):
             subprocess.run(full_command, shell=True, check=True)
         except subprocess.CalledProcessError as e:
             print(f"Error: Command failed with exit code {e.returncode}")
-            #raise
+            raise
 
 def backup_directory(hostname, directory, global_config, host_config, args):
     src = f"{hostname}:{directory}"
